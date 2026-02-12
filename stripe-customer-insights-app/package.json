@@ -1,0 +1,30 @@
+{
+  "name": "customer-insights-dashboard",
+  "version": "1.0.0",
+  "description": "Stripe App for customer insights and analytics - Interview preparation project",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "stripe apps start",
+    "build": "vite build",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stripe/ui-extension-sdk": "^5.0.0",
+    "stripe": "^17.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@stripe/stripe-apps-cli": "^2.9.0",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4",
+    "eslint": "^9.32.0"
+  }
+}
