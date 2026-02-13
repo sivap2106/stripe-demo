@@ -1,12 +1,20 @@
 {
-    "id": "com.sivapalli.helloworld",
+    "id": "com.example.customer-badge",
     "version": "0.0.1",
-    "name": "Hello World",
+    "name": "Customer Badge",
     "icon": "",
     "permissions": [
         {
             "permission": "customer_read",
-            "purpose": "Display customer name in the app"
+            "purpose": "Read customer details to determine status"
+        },
+        {
+            "permission": "charge_read",
+            "purpose": "Check customer purchase history"
+        },
+        {
+            "permission": "subscription_read",
+            "purpose": "Check if customer has active subscriptions"
         }
     ],
     "ui_extension": {
