@@ -1,18 +1,12 @@
 {
   "id": "com.example.customer-insights",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "name": "Customer Insights Dashboard",
-  "icon": "./public/icon.svg",
-  "description": "Comprehensive customer analytics with LTV, payment patterns, and risk assessment",
-
+  "icon": "",
   "permissions": [
     {
       "permission": "customer_read",
       "purpose": "Read customer data to calculate lifetime value and payment patterns"
-    },
-    {
-      "permission": "payment_method_read",
-      "purpose": "Analyze payment method usage and success rates"
     },
     {
       "permission": "charge_read",
@@ -27,42 +21,17 @@
       "purpose": "Analyze billing patterns and payment behavior"
     }
   ],
-
   "ui_extension": {
     "views": [
       {
         "viewport": "stripe.dashboard.customer.detail",
         "component": "CustomerInsights"
-      },
-      {
-        "viewport": "stripe.dashboard.customer.list",
-        "component": "CustomerListInsights"
       }
     ],
-
     "content_security_policy": {
-      "connect-src": "https://api.stripe.com",
-      "img-src": "https: data:",
-      "font-src": null
-    }
-  },
-
-  "post_install_action": {
-    "type": "external_page",
-    "url": "https://docs.example.com/setup-guide"
-  },
-
-  "app_backend": {
-    "webhooks": {
-      "api_version": "2024-12-18",
-      "events": [
-        "customer.created",
-        "customer.updated",
-        "charge.succeeded",
-        "charge.failed",
-        "subscription.created",
-        "subscription.deleted"
-      ]
+      "connect-src": null,
+      "image-src": null,
+      "purpose": ""
     }
   }
 }

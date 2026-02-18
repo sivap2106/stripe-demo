@@ -20,13 +20,13 @@ import { CustomerInsights, RiskFactor, StripeCustomerData } from '../types';
  * Makes testing easy and enables caching
  */
 export function calculateCustomerInsights(data: StripeCustomerData): CustomerInsights {
-  const { customer, charges, paymentIntents, subscriptions, invoices } = data;
+  const { customer, charges, subscriptions, invoices } = data;
 
   return {
     customerId: customer.id,
     lifetimeValue: calculateLifetimeValue(charges, subscriptions),
-    paymentPattern: analyzePaymentPattern(charges, paymentIntents),
-    riskAssessment: assessRisk(customer, charges, paymentIntents),
+    paymentPattern: analyzePaymentPattern(charges),
+    riskAssessment: assessRisk(customer, charges),
     subscriptionHealth: analyzeSubscriptions(subscriptions),
     metadata: extractMetadata(charges, customer),
   };
@@ -84,8 +84,7 @@ function calculateLifetimeValue(
  * - Low success rate = card issues, fraud risk, or dissatisfied customer
  */
 function analyzePaymentPattern(
-  charges: Stripe.Charge[],
-  paymentIntents: Stripe.PaymentIntent[]
+  charges: Stripe.Charge[]
 ): CustomerInsights['paymentPattern'] {
   const successfulPayments = charges.filter(c => c.status === 'succeeded').length;
   const failedPayments = charges.filter(c => c.status === 'failed').length;
@@ -138,8 +137,7 @@ function analyzePaymentPattern(
  */
 function assessRisk(
   customer: Stripe.Customer,
-  charges: Stripe.Charge[],
-  paymentIntents: Stripe.PaymentIntent[]
+  charges: Stripe.Charge[]
 ): CustomerInsights['riskAssessment'] {
   const factors: RiskFactor[] = [];
   let riskScore = 0;

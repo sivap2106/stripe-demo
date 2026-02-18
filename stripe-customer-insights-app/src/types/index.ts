@@ -85,7 +85,6 @@ export interface RiskFactor {
 export interface StripeCustomerData {
   customer: Stripe.Customer;
   charges: Stripe.Charge[];
-  paymentIntents: Stripe.PaymentIntent[];
   subscriptions: Stripe.Subscription[];
   invoices: Stripe.Invoice[];
 }

@@ -1,436 +1,246 @@
 /**
  * Customer Insights Dashboard Component
  *
- * INTERVIEW TOPIC: UI Design for Embedded Apps
- *
- * DESIGN PRINCIPLES:
- * 1. Consistency - Match Stripe's design system
- * 2. Performance - Lazy load data, show skeleton states
- * 3. Accessibility - Keyboard navigation, screen readers
- * 4. Responsiveness - Works on different screen sizes
- *
- * STRIPE UI EXTENSION SDK:
- * - Provides pre-built components (Box, Badge, Button, etc.)
- * - Ensures consistent look/feel with Stripe Dashboard
- * - Handles theming (light/dark mode)
+ * Shows LTV, payment patterns, risk assessment,
+ * and subscription health for the current customer.
  */
 
 import { useState, useEffect } from 'react';
 import {
   Box,
   Badge,
-  Button,
-  Card,
+  ContextView,
   Divider,
-  Grid,
-  Heading,
-  Icon,
   Inline,
-  Link,
   Spinner,
-  Text,
 } from '@stripe/ui-extension-sdk/ui';
-import { useCustomerId } from '@stripe/ui-extension-sdk/context';
-import { CustomerInsights, AppState } from '../types';
+import type { ExtensionContextValue } from '@stripe/ui-extension-sdk/context';
+import { CustomerInsights } from '../types';
 import { formatCurrency, formatDate, calculateCustomerInsights } from '../utils/calculations';
 import { fetchCustomerDataWithCache } from '../api/stripeClient';
 
-/**
- * Main Component
- *
- * ARCHITECTURE: This component:
- * 1. Reads customerId from Stripe Dashboard context
- * 2. Fetches customer data from Stripe API
- * 3. Calculates insights
- * 4. Renders metrics in cards
- */
-export default function CustomerInsights() {
-  // Stripe UI Extension SDK hook - gets current customer ID from dashboard context
-  const customerId = useCustomerId();
+type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
-  // Component state
-  const [state, setState] = useState<AppState>({
-    insights: null,
-    loadingState: 'idle',
-    error: null,
-  });
+const CustomerInsightsView = ({ environment }: ExtensionContextValue) => {
+  const customerId = environment?.objectContext?.id;
 
-  /**
-   * Load customer insights
-   *
-   * PERFORMANCE: useEffect with dependency array ensures we only fetch when customerId changes
-   * INTERVIEW POINT: Explain React hooks and component lifecycle
-   */
+  const [insights, setInsights] = useState<CustomerInsights | null>(null);
+  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!customerId) return;
 
     async function loadInsights() {
-      setState(prev => ({ ...prev, loadingState: 'loading', error: null }));
+      setLoadingState('loading');
+      setError(null);
 
       try {
-        // Fetch data from Stripe API
-        const data = await fetchCustomerDataWithCache(customerId);
-
-        // Calculate insights
-        const insights = calculateCustomerInsights(data);
-
-        setState({
-          insights,
-          loadingState: 'success',
-          error: null,
-        });
-      } catch (error) {
-        console.error('Failed to load insights:', error);
-        setState({
-          insights: null,
-          loadingState: 'error',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+        const data = await fetchCustomerDataWithCache(customerId!);
+        const calculated = calculateCustomerInsights(data);
+        setInsights(calculated);
+        setLoadingState('success');
+      } catch (err) {
+        console.error('Failed to load insights:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setLoadingState('error');
       }
     }
 
     loadInsights();
   }, [customerId]);
 
-  /**
-   * Render different states
-   *
-   * UX BEST PRACTICE: Clear feedback for each state
-   * - Loading: Skeleton/spinner
-   * - Error: Actionable error message with retry
-   * - Success: Full content
-   */
-  if (state.loadingState === 'loading') {
+  if (loadingState === 'loading') {
     return (
-      <Box padding="large">
-        <Inline alignment="center">
+      <ContextView title="Customer Insights">
+        <Box css={{ stack: "x", gap: "small", alignSelfX: "center", padding: "large" }}>
           <Spinner size="large" />
-          <Text>Loading customer insights...</Text>
-        </Inline>
-      </Box>
-    );
-  }
-
-  if (state.loadingState === 'error') {
-    return (
-      <Box padding="large">
-        <Card>
-          <Box padding="medium">
-            <Heading level={3}>Error Loading Insights</Heading>
-            <Text>{state.error}</Text>
-            <Button
-              onClick={() => setState({ ...state, loadingState: 'idle' })}
-              css={{ marginTop: 16 }}
-            >
-              Retry
-            </Button>
-          </Box>
-        </Card>
-      </Box>
-    );
-  }
-
-  if (!state.insights) {
-    return (
-      <Box padding="large">
-        <Text>No insights available</Text>
-      </Box>
-    );
-  }
-
-  /**
-   * Main render
-   *
-   * LAYOUT: Grid system for responsive cards
-   */
-  return (
-    <Box padding="large">
-      <Heading level={2}>Customer Insights</Heading>
-      <Text color="subdued">
-        Comprehensive analytics for customer {customerId}
-      </Text>
-
-      <Divider />
-
-      {/* Lifetime Value Section */}
-      <Box marginTop="large">
-        <LifetimeValueCard insights={state.insights} />
-      </Box>
-
-      {/* Payment Pattern Section */}
-      <Box marginTop="medium">
-        <PaymentPatternCard insights={state.insights} />
-      </Box>
-
-      {/* Risk Assessment Section */}
-      <Box marginTop="medium">
-        <RiskAssessmentCard insights={state.insights} />
-      </Box>
-
-      {/* Subscription Health Section */}
-      {state.insights.subscriptionHealth.totalSubscriptions > 0 && (
-        <Box marginTop="medium">
-          <SubscriptionHealthCard insights={state.insights} />
+          <Box>Loading customer insights...</Box>
         </Box>
-      )}
+      </ContextView>
+    );
+  }
 
-      {/* Metadata Section */}
-      <Box marginTop="medium">
-        <MetadataCard insights={state.insights} />
-      </Box>
-    </Box>
-  );
-}
+  if (loadingState === 'error') {
+    return (
+      <ContextView title="Customer Insights">
+        <Box css={{ padding: "large", stack: "y", gap: "medium" }}>
+          <Box css={{ font: "heading" }}>Error Loading Insights</Box>
+          <Box css={{ color: "critical" }}>{error}</Box>
+        </Box>
+      </ContextView>
+    );
+  }
 
-/**
- * Lifetime Value Card Component
- *
- * PRODUCT INSIGHT: LTV is the #1 metric merchants care about
- * - Helps identify VIP customers
- * - Informs customer acquisition cost decisions
- * - Guides retention strategies
- */
-function LifetimeValueCard({ insights }: { insights: CustomerInsights }) {
-  const { lifetimeValue } = insights;
+  if (!insights) {
+    return (
+      <ContextView title="Customer Insights">
+        <Box css={{ padding: "large" }}>No insights available</Box>
+      </ContextView>
+    );
+  }
 
   return (
-    <Card>
-      <Box padding="medium">
-        <Heading level={3}>Lifetime Value</Heading>
-
-        <Box marginTop="medium">
-          <Text size="xlarge" weight="bold">
-            {formatCurrency(lifetimeValue.total, lifetimeValue.currency)}
-          </Text>
+    <ContextView title="Customer Insights">
+      <Box css={{ stack: "y", gap: "large", padding: "medium" }}>
+        {/* Lifetime Value */}
+        <Box css={{ stack: "y", gap: "small" }}>
+          <Box css={{ font: "heading" }}>Lifetime Value</Box>
+          <Box css={{ font: "heading", color: "primary" }}>
+            {formatCurrency(insights.lifetimeValue.total, insights.lifetimeValue.currency)}
+          </Box>
+          <Box css={{ stack: "x", gap: "large" }}>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>One-time</Box>
+              <Box>{formatCurrency(insights.lifetimeValue.breakdown.oneTime, insights.lifetimeValue.currency)}</Box>
+            </Box>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Subscription</Box>
+              <Box>{formatCurrency(insights.lifetimeValue.breakdown.subscription, insights.lifetimeValue.currency)}</Box>
+            </Box>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Refunded</Box>
+              <Box>{formatCurrency(insights.lifetimeValue.breakdown.refunded, insights.lifetimeValue.currency)}</Box>
+            </Box>
+          </Box>
         </Box>
 
-        <Grid columns={3} marginTop="medium">
-          <Box>
-            <Text color="subdued" size="small">One-time</Text>
-            <Text weight="medium">
-              {formatCurrency(lifetimeValue.breakdown.oneTime, lifetimeValue.currency)}
-            </Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Subscription</Text>
-            <Text weight="medium">
-              {formatCurrency(lifetimeValue.breakdown.subscription, lifetimeValue.currency)}
-            </Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Refunded</Text>
-            <Text weight="medium">
-              {formatCurrency(lifetimeValue.breakdown.refunded, lifetimeValue.currency)}
-            </Text>
-          </Box>
-        </Grid>
-      </Box>
-    </Card>
-  );
-}
+        <Divider />
 
-/**
- * Payment Pattern Card
- *
- * METRIC: Payment success rate indicates customer health
- * - High rate = good payment method, engaged customer
- * - Low rate = potential churn risk
- */
-function PaymentPatternCard({ insights }: { insights: CustomerInsights }) {
-  const { paymentPattern } = insights;
-
-  const successRateColor = paymentPattern.successRate >= 80 ? 'positive' : 'negative';
-
-  return (
-    <Card>
-      <Box padding="medium">
-        <Heading level={3}>Payment Pattern</Heading>
-
-        <Box marginTop="medium">
+        {/* Payment Pattern */}
+        <Box css={{ stack: "y", gap: "small" }}>
+          <Box css={{ font: "heading" }}>Payment Pattern</Box>
           <Inline>
-            <Text size="xlarge" weight="bold">
-              {paymentPattern.successRate.toFixed(1)}%
-            </Text>
-            <Badge type={successRateColor === 'positive' ? 'positive' : 'negative'}>
+            <Box css={{ font: "heading" }}>
+              {insights.paymentPattern.successRate.toFixed(1)}%
+            </Box>
+            <Badge type={insights.paymentPattern.successRate >= 80 ? "positive" : "negative"}>
               Success Rate
             </Badge>
           </Inline>
+          <Box css={{ stack: "x", gap: "large" }}>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Total</Box>
+              <Box>{insights.paymentPattern.totalPayments}</Box>
+            </Box>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Successful</Box>
+              <Box>{insights.paymentPattern.successfulPayments}</Box>
+            </Box>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Failed</Box>
+              <Box>{insights.paymentPattern.failedPayments}</Box>
+            </Box>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Avg Amount</Box>
+              <Box>{formatCurrency(insights.paymentPattern.averagePaymentAmount, 'usd')}</Box>
+            </Box>
+          </Box>
+          {insights.paymentPattern.preferredPaymentMethod && (
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Preferred Method</Box>
+              <Badge type="info">{insights.paymentPattern.preferredPaymentMethod}</Badge>
+            </Box>
+          )}
         </Box>
 
-        <Grid columns={2} marginTop="medium">
-          <Box>
-            <Text color="subdued" size="small">Total Payments</Text>
-            <Text weight="medium">{paymentPattern.totalPayments}</Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Successful</Text>
-            <Text weight="medium" color="positive">
-              {paymentPattern.successfulPayments}
-            </Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Failed</Text>
-            <Text weight="medium" color="negative">
-              {paymentPattern.failedPayments}
-            </Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Avg Amount</Text>
-            <Text weight="medium">
-              {formatCurrency(paymentPattern.averagePaymentAmount, 'usd')}
-            </Text>
-          </Box>
-        </Grid>
+        <Divider />
 
-        {paymentPattern.preferredPaymentMethod && (
-          <Box marginTop="medium">
-            <Text color="subdued" size="small">Preferred Method</Text>
-            <Badge>{paymentPattern.preferredPaymentMethod}</Badge>
-          </Box>
-        )}
-      </Box>
-    </Card>
-  );
-}
-
-/**
- * Risk Assessment Card
- *
- * PM DECISION: How to present risk without alarming users?
- * - Use color coding (green/yellow/red)
- * - Provide context (why is this risky?)
- * - Suggest actions (what should merchant do?)
- */
-function RiskAssessmentCard({ insights }: { insights: CustomerInsights }) {
-  const { riskAssessment } = insights;
-
-  const badgeType =
-    riskAssessment.recommendation === 'low_risk'
-      ? 'positive'
-      : riskAssessment.recommendation === 'medium_risk'
-      ? 'warning'
-      : 'negative';
-
-  return (
-    <Card>
-      <Box padding="medium">
-        <Heading level={3}>Risk Assessment</Heading>
-
-        <Box marginTop="medium">
+        {/* Risk Assessment */}
+        <Box css={{ stack: "y", gap: "small" }}>
+          <Box css={{ font: "heading" }}>Risk Assessment</Box>
           <Inline>
-            <Text size="xlarge" weight="bold">
-              {riskAssessment.score}/100
-            </Text>
-            <Badge type={badgeType}>
-              {riskAssessment.recommendation.replace('_', ' ').toUpperCase()}
+            <Box css={{ font: "heading" }}>{insights.riskAssessment.score}/100</Box>
+            <Badge type={
+              insights.riskAssessment.recommendation === 'low_risk' ? 'positive' :
+              insights.riskAssessment.recommendation === 'medium_risk' ? 'warning' : 'negative'
+            }>
+              {insights.riskAssessment.recommendation.replace('_', ' ').toUpperCase()}
             </Badge>
           </Inline>
-        </Box>
-
-        {riskAssessment.factors.length > 0 && (
-          <Box marginTop="medium">
-            <Text weight="medium">Risk Factors:</Text>
-            {riskAssessment.factors.map((factor, index) => (
-              <Box key={index} marginTop="small">
-                <Inline>
+          {insights.riskAssessment.factors.length > 0 ? (
+            <Box css={{ stack: "y", gap: "small" }}>
+              {insights.riskAssessment.factors.map((factor, i) => (
+                <Inline key={i}>
                   <Badge type={factor.severity === 'high' ? 'negative' : 'warning'}>
                     {factor.severity}
                   </Badge>
-                  <Text size="small">{factor.description}</Text>
+                  <Box css={{ font: "caption" }}>{factor.description}</Box>
                 </Inline>
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        {riskAssessment.factors.length === 0 && (
-          <Box marginTop="medium">
-            <Text color="positive">No risk factors detected</Text>
-          </Box>
-        )}
-      </Box>
-    </Card>
-  );
-}
-
-/**
- * Subscription Health Card
- */
-function SubscriptionHealthCard({ insights }: { insights: CustomerInsights }) {
-  const { subscriptionHealth } = insights;
-
-  return (
-    <Card>
-      <Box padding="medium">
-        <Heading level={3}>Subscription Health</Heading>
-
-        <Box marginTop="medium">
-          <Text size="xlarge" weight="bold">
-            {formatCurrency(subscriptionHealth.monthlyRecurringRevenue, 'usd')}
-          </Text>
-          <Text color="subdued" size="small">Monthly Recurring Revenue</Text>
+              ))}
+            </Box>
+          ) : (
+            <Box css={{ color: "info" }}>No risk factors detected</Box>
+          )}
         </Box>
 
-        <Grid columns={3} marginTop="medium">
-          <Box>
-            <Text color="subdued" size="small">Active</Text>
-            <Text weight="medium">{subscriptionHealth.activeSubscriptions}</Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Total</Text>
-            <Text weight="medium">{subscriptionHealth.totalSubscriptions}</Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Churned</Text>
-            <Text weight="medium">{subscriptionHealth.churnedSubscriptions}</Text>
-          </Box>
-        </Grid>
-
-        {subscriptionHealth.nextBillingDate && (
-          <Box marginTop="medium">
-            <Text color="subdued" size="small">Next Billing</Text>
-            <Text weight="medium">{formatDate(subscriptionHealth.nextBillingDate)}</Text>
-          </Box>
+        {/* Subscription Health */}
+        {insights.subscriptionHealth.totalSubscriptions > 0 && (
+          <>
+            <Divider />
+            <Box css={{ stack: "y", gap: "small" }}>
+              <Box css={{ font: "heading" }}>Subscription Health</Box>
+              <Box css={{ font: "heading" }}>
+                {formatCurrency(insights.subscriptionHealth.monthlyRecurringRevenue, 'usd')}
+              </Box>
+              <Box css={{ font: "caption", color: "secondary" }}>Monthly Recurring Revenue</Box>
+              <Box css={{ stack: "x", gap: "large" }}>
+                <Box css={{ stack: "y" }}>
+                  <Box css={{ font: "caption", color: "secondary" }}>Active</Box>
+                  <Box>{insights.subscriptionHealth.activeSubscriptions}</Box>
+                </Box>
+                <Box css={{ stack: "y" }}>
+                  <Box css={{ font: "caption", color: "secondary" }}>Total</Box>
+                  <Box>{insights.subscriptionHealth.totalSubscriptions}</Box>
+                </Box>
+                <Box css={{ stack: "y" }}>
+                  <Box css={{ font: "caption", color: "secondary" }}>Churned</Box>
+                  <Box>{insights.subscriptionHealth.churnedSubscriptions}</Box>
+                </Box>
+              </Box>
+              {insights.subscriptionHealth.nextBillingDate && (
+                <Box css={{ stack: "y" }}>
+                  <Box css={{ font: "caption", color: "secondary" }}>Next Billing</Box>
+                  <Box>{formatDate(insights.subscriptionHealth.nextBillingDate)}</Box>
+                </Box>
+              )}
+            </Box>
+          </>
         )}
+
+        <Divider />
+
+        {/* Customer Timeline */}
+        <Box css={{ stack: "y", gap: "small" }}>
+          <Box css={{ font: "heading" }}>Customer Timeline</Box>
+          <Box css={{ stack: "x", gap: "large" }}>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>First Purchase</Box>
+              <Box>{formatDate(insights.metadata.firstPurchaseDate)}</Box>
+            </Box>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Last Purchase</Box>
+              <Box>{formatDate(insights.metadata.lastPurchaseDate)}</Box>
+            </Box>
+          </Box>
+          <Box css={{ stack: "x", gap: "large" }}>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Days Since Last</Box>
+              <Box>
+                {insights.metadata.daysSinceLastPurchase !== null
+                  ? `${insights.metadata.daysSinceLastPurchase} days`
+                  : 'N/A'}
+              </Box>
+            </Box>
+            <Box css={{ stack: "y" }}>
+              <Box css={{ font: "caption", color: "secondary" }}>Total Transactions</Box>
+              <Box>{insights.metadata.totalTransactions}</Box>
+            </Box>
+          </Box>
+        </Box>
       </Box>
-    </Card>
+    </ContextView>
   );
-}
+};
 
-/**
- * Metadata Card
- */
-function MetadataCard({ insights }: { insights: CustomerInsights }) {
-  const { metadata } = insights;
-
-  return (
-    <Card>
-      <Box padding="medium">
-        <Heading level={3}>Customer Timeline</Heading>
-
-        <Grid columns={2} marginTop="medium">
-          <Box>
-            <Text color="subdued" size="small">First Purchase</Text>
-            <Text weight="medium">{formatDate(metadata.firstPurchaseDate)}</Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Last Purchase</Text>
-            <Text weight="medium">{formatDate(metadata.lastPurchaseDate)}</Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Days Since Last Purchase</Text>
-            <Text weight="medium">
-              {metadata.daysSinceLastPurchase !== null
-                ? `${metadata.daysSinceLastPurchase} days`
-                : 'N/A'}
-            </Text>
-          </Box>
-          <Box>
-            <Text color="subdued" size="small">Total Transactions</Text>
-            <Text weight="medium">{metadata.totalTransactions}</Text>
-          </Box>
-        </Grid>
-      </Box>
-    </Card>
-  );
-}
+export default CustomerInsightsView;
